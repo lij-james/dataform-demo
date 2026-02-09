@@ -1,0 +1,39 @@
+config {
+    type: "operations",
+    schema: "mri_bronze_ext",
+    name: "appr",
+    tags: ["bronze", "mri"],
+    description: "MRI APPR.csv external table (Bronze layer)",
+    hasOutput: true
+}
+  -- sync to git (try again)
+  /*
+  We define EVERY column as STRING for robustness. That avoids CSV edge cases
+  and lets us do all typing safely in Silver. (DDL CREATE EXTERNAL TABLE doesn't
+  support 'autodetect'; you either pass schema in DDL or use the API.)
+  */
+CREATE OR REPLACE EXTERNAL TABLE
+  `colliers-apc-plafrm-box1.mri_bronze_ext.appr` ( TABLEID STRING,
+    TABLEKEY STRING,
+    RECNUM STRING,
+    APPRDATE STRING,
+    IE_TYPE STRING,
+    FC_AMOUNT STRING,
+    REVCAP STRING,
+    DISCRATE STRING,
+    LASTDATE STRING,
+    USERID STRING,
+    LEV_AMOUNT STRING,
+    HOLDPER STRING,
+    APPRAISER STRING,
+    INC_RATE STRING,
+    EXP_RATE STRING,
+    FP_TYPE STRING,
+    YEAR1CAP STRING,
+    APPR_NOTE STRING ) OPTIONS ( format = "CSV",
+    uris = ["gs://terraform-colliers-apc-plafrm-box1/APPR.csv"],
+    skip_leading_rows = 1
+    -- If the CSV has tricky lines, you can enable:
+    -- , allow_quoted_newlines = TRUE
+    -- , allow_jagged_rows = TRUE
+    );

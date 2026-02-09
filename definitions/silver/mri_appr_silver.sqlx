@@ -1,0 +1,91 @@
+config {
+  type: "table",
+  schema: "mri_silver",
+  name: "appr_dataform_clean",     
+  tags: ["silver", "mri"],
+  description: "MRI APPR Silver table (typed, cleaned, +_ingestion_ts, +_source_file)"
+}
+
+/* STEP 1: trim & convert blanks to NULL from Bronze */
+WITH raw AS (
+  SELECT
+    TRIM(TABLEID)     AS TABLEID,
+    TRIM(TABLEKEY)    AS TABLEKEY,
+    TRIM(RECNUM)      AS RECNUM,
+    TRIM(APPRDATE)    AS APPRDATE,
+    TRIM(IE_TYPE)     AS IE_TYPE,
+    TRIM(FC_AMOUNT)   AS FC_AMOUNT,
+    TRIM(REVCAP)      AS REVCAP,
+    TRIM(DISCRATE)    AS DISCRATE,
+    TRIM(LASTDATE)    AS LASTDATE,
+    TRIM(USERID)      AS USERID,
+    TRIM(LEV_AMOUNT)  AS LEV_AMOUNT,
+    TRIM(HOLDPER)     AS HOLDPER,
+    TRIM(APPRAISER)   AS APPRAISER,
+    TRIM(INC_RATE)    AS INC_RATE,
+    TRIM(EXP_RATE)    AS EXP_RATE,
+    TRIM(FP_TYPE)     AS FP_TYPE,
+    TRIM(YEAR1CAP)    AS YEAR1CAP,
+    TRIM(APPR_NOTE)   AS APPR_NOTE,
+    _FILE_NAME
+  FROM ${ref("mri_bronze_ext", "appr")}
+),
+clean AS (
+  SELECT
+    NULLIF(TABLEID,    '') AS TABLEID,
+    NULLIF(TABLEKEY,   '') AS TABLEKEY,
+    NULLIF(RECNUM,     '') AS RECNUM,
+    NULLIF(APPRDATE,   '') AS APPRDATE,
+    NULLIF(IE_TYPE,    '') AS IE_TYPE,
+    NULLIF(FC_AMOUNT,  '') AS FC_AMOUNT,
+    NULLIF(REVCAP,     '') AS REVCAP,
+    NULLIF(DISCRATE,   '') AS DISCRATE,
+    NULLIF(LASTDATE,   '') AS LASTDATE,
+    NULLIF(USERID,     '') AS USERID,
+    NULLIF(LEV_AMOUNT, '') AS LEV_AMOUNT,
+    NULLIF(HOLDPER,    '') AS HOLDPER,
+    NULLIF(APPRAISER,  '') AS APPRAISER,
+    NULLIF(INC_RATE,   '') AS INC_RATE,
+    NULLIF(EXP_RATE,   '') AS EXP_RATE,
+    NULLIF(FP_TYPE,    '') AS FP_TYPE,
+    NULLIF(YEAR1CAP,   '') AS YEAR1CAP,
+    NULLIF(APPR_NOTE,  '') AS APPR_NOTE,
+    _FILE_NAME
+  FROM raw
+)
+
+/* STEP 2: cast to target types + add Silver metadata */
+SELECT
+  -- IDs / codes
+  TABLEID                                  AS table_id,             -- STRING
+  SAFE_CAST(TABLEKEY AS INT64)             AS table_key,            -- INT64
+  SAFE_CAST(RECNUM   AS INT64)             AS rec_num,              -- INT64
+
+  -- Times (examples looked like '21:56.0'): parse as TIME
+  SAFE.PARSE_TIME('%H:%M.%E*S', APPRDATE)  AS appr_time,            -- TIME
+  SAFE.PARSE_TIME('%H:%M.%E*S', LASTDATE)  AS last_time,            -- TIME
+
+  -- Categories / users
+  IE_TYPE                                  AS ie_type,              -- STRING
+  USERID                                   AS user_id,              -- STRING
+  APPRAISER                                AS appraiser,            -- STRING
+  FP_TYPE                                  AS fp_type,              -- STRING
+
+  -- Amounts & rates
+  SAFE_CAST(FC_AMOUNT  AS NUMERIC)         AS fc_amount,            -- NUMERIC
+  SAFE_CAST(REVCAP     AS NUMERIC)         AS rev_cap,              -- NUMERIC
+  SAFE_CAST(DISCRATE   AS NUMERIC)         AS disc_rate,            -- NUMERIC
+  SAFE_CAST(LEV_AMOUNT AS NUMERIC)         AS lev_amount,           -- NUMERIC
+  SAFE_CAST(HOLDPER    AS INT64)           AS hold_per,             -- INT64
+  SAFE_CAST(INC_RATE   AS NUMERIC)         AS inc_rate,             -- NUMERIC
+  SAFE_CAST(EXP_RATE   AS NUMERIC)         AS exp_rate,             -- NUMERIC
+  SAFE_CAST(YEAR1CAP   AS NUMERIC)         AS year1_cap,            -- NUMERIC
+
+  -- Notes
+  APPR_NOTE                                AS appr_note,            -- STRING
+
+  -- Silver metadata
+  CURRENT_TIMESTAMP()                      AS _ingestion_ts,
+  COALESCE(REGEXP_EXTRACT(_FILE_NAME, r'[^/]+$'), 'APPR.csv') AS _source_file
+
+FROM clean
