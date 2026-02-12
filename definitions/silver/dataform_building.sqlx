@@ -1,0 +1,96 @@
+config {
+    type: "table",
+    schema: "mri_silver",
+    name: "dataform_building",
+    description: "Building master data cleaned for the Silver layer"
+}
+
+SELECT
+  'B' || UPPER(RTRIM(LTRIM(BLDG.BLDGID))) AS BLDGID,
+  BLDG.BLDGID AS `Building ID`,
+  PROJ.PROJNAME AS Project,
+  PORT.PORTID AS `Portfolio ID`,
+  PORT.DESCRPN AS `Portfolio Name`,
+  (CASE WHEN BLDG.BLDGID LIKE 'P%' THEN 'Y' ELSE 'N' END) AS `Promo Building`,
+  BLDG.BCATID AS `Centre Category ID`,
+  (
+    SELECT CODELIST.CODEDESC
+    FROM `colliers-apc-plafrm-box1.Bronze_MRI.CODELIST` AS CODELIST
+    WHERE CODELIST.CODETYPE = 'RETAILBCAT' AND CODELIST.CODEVAL = BLDG.BCATID
+  ) AS `Centre Category`,
+  LTRIM(RTRIM(BLDG.BLDGNAME)) AS Building,
+  (CASE WHEN LEFT(BLDG.BLDGNAME, 4) = 'Sold' THEN 'Y' ELSE 'N' END) AS `Sold Property`,
+  LTRIM(RTRIM(BLDG.ADDRESS1)) AS `Building Address1`,
+  LTRIM(RTRIM(BLDG.ADDRESS2)) AS `Building Address2`,
+  BLDG.CITY AS City,
+  BLDG.ZIPCODE AS `Post Code`,
+  BLDG.INACTIVE AS `BLDG_INACTIVE`,
+  CASE BLDG.INACTIVE
+    WHEN 'Y' THEN 'Inactive'
+    ELSE 'Active'
+    END
+    AS `Building Status`,
+  UPPER(BLDG.STATE) AS State,
+  BLDG.CARPARK AS `Car Park`,
+  MNGR.MNGRID AS `Manager ID`,
+  MNGR.MNGRNAME AS Manager,
+  MNGR.EMAIL AS `Manager Email`,
+  MNGR.MOBILE AS `Manager Mobile`,
+  MNGR.OFFPHONE AS `Manager Phone`,
+  PTYP.DESCRPN AS `Property Type`,
+  CIT_GEOGRAPHY.LATITUDE AS LATITUDE,
+  CIT_GEOGRAPHY.LONGITUDE AS LONGITUDE,
+  '[' || CAST(CIT_GEOGRAPHY.LONGITUDE AS STRING) || ','
+    || CAST(CIT_GEOGRAPHY.LATITUDE AS STRING) || ']'
+    AS Coordinates,
+  BLDG.SQFTTYPE AS `Area Type`,
+  BLDG.measurbl AS `Measurabl Building`,
+  C1.CODEDESC AS `Building Use`,
+  C2.CODEDESC AS `Property Sub Type`,
+  APPR.FC_AMOUNT AS `Appraisal Value`,
+  RIGHT(ENTITY.YEAREND, 2) AS FYENDMON_NUM,
+  C3.CODEVAL AS `PandL Allocation`,
+  C4.CODEDESC AS `CI Office Location`,
+  CASE
+    WHEN FM.MNGRID IS NULL THEN PM.MNGRID
+    ELSE FM.MNGRID
+    END
+    AS `Primary FM Manager ID`,
+  CASE
+    WHEN FM.MNGRID IS NULL THEN MNGR3.MNGRNAME
+    ELSE MNGR2.MNGRNAME
+    END
+    AS `Primary FM Manager`,
+  LOM.LocationName AS `FM Location Name` 
+
+FROM `colliers-apc-plafrm-box1.Bronze_MRI.BLDG` AS BLDG
+INNER JOIN `colliers-apc-plafrm-box1.Bronze_MRI.ENTITY` AS ENTITY ON BLDG.ENTITYID = ENTITY.ENTITYID
+INNER JOIN `colliers-apc-plafrm-box1.Bronze_MRI.PROJ` AS PROJ ON ENTITY.PROJID = PROJ.PROJID
+INNER JOIN `colliers-apc-plafrm-box1.Bronze_MRI.PORT` AS PORT ON PORT.PORTID = PROJ.PORTID
+LEFT OUTER JOIN `colliers-apc-plafrm-box1.Bronze_MRI.MNGR` AS MNGR ON BLDG.MNGRID = MNGR.MNGRID
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.PTYP` AS PTYP ON BLDG.PROPID = PTYP.PROPTYPE
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CIT_GEOGRAPHY` AS CIT_GEOGRAPHY
+    ON BLDG.BLDGID = CIT_GEOGRAPHY.BLDGID
+    AND CIT_GEOGRAPHY.LATITUDE <> 0
+    AND CIT_GEOGRAPHY.LONGITUDE <> 0 
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CODELIST` AS C1 ON BLDG.BLDGUSE = C1.CODEVAL AND C1.CODETYPE = 'BLDGUSE'
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CODELIST` AS C2 ON BLDG.PROPSUBTYPE = C2.CODEVAL AND C2.CODETYPE = 'PROPSUBTYPE' 
+LEFT JOIN (
+    SELECT tablekey, fc_amount
+    FROM `colliers-apc-plafrm-box1.Bronze_MRI.APPR`
+    WHERE tableid = 'bldg'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY tablekey ORDER BY apprdate DESC) = 1
+  ) AS APPR ON APPR.tablekey = BLDG.bldgid 
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CODELIST` AS C3 ON C3.CODETYPE = 'PLALLOC     ' AND C3.CODEVAL = BLDG.PLALLOC
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CODELIST` AS C4 ON C4.CODETYPE = 'SUNLOCATE' AND C4.CODEVAL = ENTITY.OFFICELOC  
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CIT_BLDGMNGR` AS FM ON FM.BLDGID = BLDG.BLDGID AND FM.FMROLE = 'FM'
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.MNGR` AS MNGR2 ON MNGR2.MNGRID = FM.MNGRID
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.CIT_BLDGMNGR` AS PM ON PM.BLDGID = BLDG.BLDGID AND PM.FMROLE = 'PM'
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.MNGR` AS MNGR3 ON MNGR3.MNGRID = PM.MNGRID
+LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.LOCATIONMASTER` AS LOM ON LOM.LOCATIONCODE = BLDG.BLDGID 
+
+WHERE
+  BLDG.BLDGID IN (
+    SELECT BLDGID
+    FROM `colliers-apc-plafrm-box1.Bronze_MRI.CIF_BLDG_Normal_Active_AND_OS`()
+  )
