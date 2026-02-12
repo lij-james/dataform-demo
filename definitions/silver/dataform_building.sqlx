@@ -4,7 +4,7 @@ config {
     name: "dataform_building",
     description: "Building master data cleaned for the Silver layer"
 }
-/* testing */
+/* testing  */
 SELECT
   'B' || UPPER(RTRIM(LTRIM(BLDG.BLDGID))) AS BLDGID,
   BLDG.BLDGID AS `Building ID`,
