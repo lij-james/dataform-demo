@@ -1,10 +1,11 @@
 config {
-    type: "table",
+    type: "incremental",
     schema: "mri_silver",
     name: "dataform_building",
-    description: "Building master data cleaned for the Silver layer"
+    description: "Building master data cleaned for the Silver layer",
+    uniqueKey: ["BLDGID"]
 }
-/* testing  */
+
 SELECT
   'B' || UPPER(RTRIM(LTRIM(BLDG.BLDGID))) AS BLDGID,
   BLDG.BLDGID AS `Building ID`,
@@ -90,7 +91,4 @@ LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.MNGR` AS MNGR3 ON MNGR3.MNGRID = 
 LEFT JOIN `colliers-apc-plafrm-box1.Bronze_MRI.LOCATIONMASTER` AS LOM ON LOM.LOCATIONCODE = BLDG.BLDGID 
 
 WHERE
-  BLDG.BLDGID IN (
-    SELECT BLDGID
-    FROM `colliers-apc-plafrm-box1.Bronze_MRI.CIF_BLDG_Normal_Active_AND_OS`()
-  )
+  BLDG.BLDGID = 'SEN001'
