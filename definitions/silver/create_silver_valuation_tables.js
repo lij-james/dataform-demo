@@ -462,5 +462,32 @@ operate("valuation_silver_refresh").queries(ctx => `
     LEFT JOIN UNNEST(JSON_QUERY_ARRAY(full_json.outputs.discountedCashflow.holdPeriodCashflow.renewalTypeBaseRents)) AS hp 
            ON JSON_VALUE(cap.name) = JSON_VALUE(hp.name);
 
+           -- ==========================================
+    -- SECTION 5: RENT REVIEWS & REFURBISHMENTS (The missing tables)
+    -- ==========================================
+
+    -- TABLE 19: inputs_spaces_rent_reviews (Unrolled Rent Review Schedules)
+    CREATE OR REPLACE TABLE \`${targetDataset}.inputs_spaces_rent_reviews\` AS
+    SELECT 
+      JSON_VALUE(full_json.attributes.modelId) as modelId,
+      JSON_VALUE(s.lease.tenantName) as tenantName,
+      JSON_VALUE(s.level) as level,
+      JSON_VALUE(s.suite) as suite,
+      -- Assuming standard rent review fields (Type, Date, Value) when populated
+      JSON_VALUE(rr.type) as reviewType,
+      JSON_VALUE(rr.date) as reviewDate,
+      SAFE_CAST(JSON_VALUE(rr.value) AS FLOAT64) as reviewValue
+    FROM UNNEST(JSON_QUERY_ARRAY(full_json.inputs.spaces)) AS s,
+         UNNEST(JSON_QUERY_ARRAY(s.lease.rentReviews)) AS rr
+    WHERE JSON_VALUE(s.lease.tenantName) IS NOT NULL AND JSON_VALUE(s.lease.tenantName) != '-';
+
+    -- TABLE 20: inputs_refurbishment_forecasts (Unrolled 10-Year Refurbishment amounts)
+    CREATE OR REPLACE TABLE \`${targetDataset}.inputs_refurbishment_forecasts\` AS
+    SELECT 
+      JSON_VALUE(full_json.attributes.modelId) as modelId,
+      year_offset as year_index,
+      SAFE_CAST(JSON_VALUE(amount) AS FLOAT64) as forecastAmount
+    FROM UNNEST(JSON_QUERY_ARRAY(full_json.inputs.capex.refurbishment.amounts)) AS amount WITH OFFSET as year_offset;
+
   END;
 `);
