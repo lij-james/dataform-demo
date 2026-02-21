@@ -6,9 +6,9 @@ const targetDataset = "colliers-apc-plafrm-box1.silver_val";
 // The operate block runs custom multi-statement SQL in BigQuery
 operate("valuation_silver_refresh").queries(ctx => `
   BEGIN
-    -- 1. STITCH JSON: Combine all raw lines into one valid JSON object
+    -- 1. STITCH JSON: Combine all raw lines into one valid JSON object (Removed SAFE and ORDER BY)
     DECLARE full_json JSON;
-    SET full_json = (SELECT SAFE.PARSE_JSON(STRING_AGG(json_content, ' ' ORDER BY json_content)) FROM \`${sourceTable}\`);
+    SET full_json = (SELECT PARSE_JSON(STRING_AGG(json_content, ' ')) FROM \`${sourceTable}\`);
 
     -- ==========================================
     -- SECTION 1: CORE BUILDING DATA (1:1)
