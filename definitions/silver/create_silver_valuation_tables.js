@@ -1,14 +1,14 @@
 // --- CONFIGURATION ---
 const project = "colliers-apc-plafrm-box1";
-const sourceTable = "colliers-apc-plafrm-box1.bronze_val.bronze_valuation_fixed";
+const sourceTable = "colliers-apc-plafrm-box1.bronze_val.bronze_single_row";
 const targetDataset = "colliers-apc-plafrm-box1.silver_val";
 
 // The operate block runs custom multi-statement SQL in BigQuery
 operate("valuation_silver_refresh").queries(ctx => `
   BEGIN
-    -- 1. STITCH JSON: Combine all raw lines into one valid JSON object (Removed SAFE and ORDER BY)
+    -- 1. PARSE JSON: Read the single, flattened row directly
     DECLARE full_json JSON;
-    SET full_json = (SELECT PARSE_JSON(STRING_AGG(json_content, ' ')) FROM \`${sourceTable}\`);
+    SET full_json = (SELECT PARSE_JSON(json_content) FROM \`${sourceTable}\`);
 
     -- ==========================================
     -- SECTION 1: CORE BUILDING DATA (1:1)
